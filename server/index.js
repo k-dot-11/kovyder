@@ -1,37 +1,121 @@
+const puppeteer = require('puppeteer');
 const express = require('express');
 
-const PORT = process.env.PORT || 3001;
-
 const app = express();
-const rp = require('request-promise');
-const cheerio = require('cheerio');
 
-let animes = [];
-let scores = [];
-let combined = [];
+app.get('/', function(req, res) {
+	(async () => {
+		const browser = await puppeteer.launch({
+                  headless: true,
+                  args: ['--no-sandbox','--disable-setuid-sandbox']
+                })
+		const page = await browser.newPage({ waitUntil: 'networkidle0' });
+		await page.goto('https://www.worldometers.info/coronavirus/');
+		await page.waitForSelector('body');
 
-const options = {
-	url: 'https://myanimelist.net/topanime.php',
-	transform: (body) => cheerio.load(body)
-};
+		let data = await page.evaluate(() => {
+			let result = [];
+			let countries = [];
+			let totalCases = [];
+			let newCases = [];
+			let totalDeaths = [];
+			let newDeaths = [];
+			let totalRecovered = [];
+			let activeCases = [];
+			let seriousCritical = [];
+			let totalTests = [];
+			let rPopulation = [];
 
-rp(options).then(function($) {
-	$('h3.anime_ranking_h3 a').each(function(i, elm) {
-		animes.push($(this).text());
-	});
-	$('span.text.on.score-label').each(function(i, elm) {
-		scores.push($(this).text());
-	});
+			let countryRequest = document.body.querySelectorAll('a.mt_a');
+			countryRequest.forEach((item) => {
+				countries.push(item.innerText);
+			});
 
-	for (let i = 0; i < animes.length; ++i) {
-		combined.push({ animeName: animes[i], animeScore: scores[i] });
-	}
+			let totalCasesRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td.sorting_1'
+			);
+			totalCasesRequest.forEach((item) => {
+				totalCases.push(item.innerText);
+			});
+
+			let newCasesRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(4)'
+			);
+			newCasesRequest.forEach((item) => {
+				newCases.push(item.innerText);
+			});
+
+			let deathRequests = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(5)'
+			);
+			deathRequests.forEach((item) => {
+				totalDeaths.push(item.innerText);
+			});
+
+			let newDeathsRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(6)'
+			);
+			newDeathsRequest.forEach((item) => {
+				newDeaths.push(item.innerText);
+			});
+
+			let totalRecoveredRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(7)'
+			);
+			totalRecoveredRequest.forEach((item) => {
+				totalRecovered.push(item.innerText);
+			});
+
+			let activeCasesRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(8)'
+			);
+			activeCasesRequest.forEach((item) => {
+				activeCases.push(item.innerText);
+			});
+
+			let seriousCriticalRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(9)'
+			);
+			seriousCriticalRequest.forEach((item) => {
+				seriousCritical.push(item.innerText);
+			});
+
+			let totalTestsRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(12)'
+			);
+			totalTestsRequest.forEach((item) => {
+				totalTests.push(item.innerText);
+			});
+
+			let populationRequest = document.body.querySelectorAll(
+				'#main_table_countries_yesterday > tbody:nth-child(2) > tr:not(.total_row_world) > td:nth-child(14) > a'
+			);
+			populationRequest.forEach((item) => {
+				rPopulation.push(item.innerText);
+			});
+
+			for (var i = 0; i < totalCases.length; ++i) {
+				result.push({
+					countryName: countries[i],
+					cases: totalCases[i],
+					new_cases: newCases[i],
+					deaths: totalDeaths[i],
+					new_deaths : newDeaths[i],
+					total_recovered : totalRecovered[i],
+					active_cases : activeCases[i],
+					serious_cases : seriousCritical[i],
+					total_tests : totalTests[i],
+					population : rPopulation[i],
+				});
+			}	
+
+			return result;
+		});
+
+		await browser.close();
+		res.send(data);
+	})();
 });
-
-app.listen(PORT, () => {
-	console.log(`Server listening on ${PORT}`);
-});
-
-app.get('/api', (req, res) => {
-	res.json({ anime: combined });
-});
+const port = process.env.PORT || 8000;
+app.listen(port);
+module.exports = app;
